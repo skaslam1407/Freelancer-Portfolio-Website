@@ -14,6 +14,16 @@ export default async function AdminLayout({
     redirect("/admin/login");
   }
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile?.is_admin) {
+    redirect("/admin/login?error=unauthorized");
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <AdminSidebar />

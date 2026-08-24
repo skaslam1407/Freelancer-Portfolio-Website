@@ -58,12 +58,29 @@ export default function NewProjectForm() {
 
     setIsSubmitting(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const payload = {
+        ...formData,
+        sort_order: Number(formData.sort_order),
+        featured: Boolean(formData.featured),
+        technologies: formData.technologies,
+      };
+
+      const res = await fetch("/api/admin/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create project");
+      }
+
       addToast({ title: "Project created", description: "Project has been created successfully", type: "success" });
       router.push("/admin/projects");
       router.refresh();
-    } catch {
-      addToast({ title: "Failed to create", description: "Please try again", type: "error" });
+    } catch (err: any) {
+      addToast({ title: "Failed to create", description: err.message || "Please try again", type: "error" });
     } finally {
       setIsSubmitting(false);
     }

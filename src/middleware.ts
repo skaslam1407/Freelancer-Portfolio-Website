@@ -43,6 +43,20 @@ export async function middleware(request: NextRequest) {
       url.searchParams.set("redirect", request.nextUrl.pathname);
       return NextResponse.redirect(url);
     }
+
+    // Check if user is admin
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_admin")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.is_admin) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/admin/login";
+      url.searchParams.set("error", "unauthorized");
+      return NextResponse.redirect(url);
+    }
   }
 
   if (isLoginRoute && user) {

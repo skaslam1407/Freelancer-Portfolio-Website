@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Heading, Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea } from "@/components";
-import { Loader2, Save, User, Mail, Globe, Shield, Key } from "lucide-react";
+import { Loader2, Save, User, Mail, Globe, Shield, Key, Image, Upload, Loader } from "lucide-react";
 import { useToast } from "@/components/Toast";
+import { MediaUploader } from "@/components/MediaUploader";
 
 const tabs = [
   { id: "profile", label: "Profile", icon: User },
   { id: "contact", label: "Contact", icon: Mail },
   { id: "seo", label: "SEO", icon: Globe },
+  { id: "branding", label: "Branding", icon: Image },
   { id: "security", label: "Security", icon: Shield },
 ];
 
@@ -40,13 +42,86 @@ export default function AdminSettingsPage() {
     twitter_handle: "@developer",
   });
 
+  const [branding, setBranding] = useState({
+    logo_light: "",
+    logo_dark: "",
+    favicon: "",
+    site_name: "Portfolio",
+    primary_color: "#0f172a",
+    accent_color: "#0f172a",
+    theme_preset: "slate",
+  });
+
+  const themePresets = [
+    { name: "Slate", primary: "#0f172a", accent: "#0f172a", id: "slate" },
+    { name: "Blue", primary: "#1e3a5f", accent: "#2563eb", id: "blue" },
+    { name: "Emerald", primary: "#064e3b", accent: "#059669", id: "emerald" },
+    { name: "Violet", primary: "#3b0764", accent: "#7c3aed", id: "violet" },
+    { name: "Rose", primary: "#7f1d1d", accent: "#e11d48", id: "rose" },
+    { name: "Amber", primary: "#78350f", accent: "#d97706", id: "amber" },
+    { name: "Cyan", primary: "#164e63", accent: "#0891b2", id: "cyan" },
+    { name: "Indigo", primary: "#2d1b4e", accent: "#4f46e5", id: "indigo" },
+  ];
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch("/api/admin/settings");
+      if (res.ok) {
+        const { data } = await res.json();
+        if (data) {
+          if (data.seo_defaults) {
+            setSeo(s => ({ ...s, ...data.seo_defaults }));
+          }
+          if (data.branding) setBranding(b => ({ ...b, ...data.branding }));
+          if (data.contact_email) setContact(c => ({ ...c, contact_email: data.contact_email }));
+          if (data.contact_phone) setContact(c => ({ ...c, contact_phone: data.contact_phone }));
+          if (data.address) setContact(c => ({ ...c, address: data.address }));
+          if (data.social_links) setContact(c => ({ ...c, social_links: { ...c.social_links, ...data.social_links } }));
+          if (data.availability_text) setContact(c => ({ ...c, availability_text: data.availability_text }));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          site_title: seo.site_title,
+          site_description: seo.site_description,
+          og_image: seo.og_image,
+          twitter_handle: seo.twitter_handle,
+          branding: {
+            ...branding,
+            primary_color: branding.primary_color,
+            accent_color: branding.accent_color,
+            theme_preset: branding.theme_preset,
+          },
+          contact_email: contact.contact_email,
+          contact_phone: contact.contact_phone,
+          address: contact.address,
+          social_links: contact.social_links,
+          availability_text: contact.availability_text,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to save");
+      }
+
       addToast({ title: "Settings saved", type: "success" });
-    } catch {
-      addToast({ title: "Failed to save", type: "error" });
+    } catch (err: any) {
+      addToast({ title: "Failed to save", description: err.message, type: "error" });
     } finally {
       setIsSaving(false);
     }
@@ -91,6 +166,137 @@ export default function AdminSettingsPage() {
               <Textarea label="Site Description" value={seo.site_description} onChange={(e) => setSeo(s => ({ ...s, site_description: e.target.value }))} rows={3} />
               <Input label="Default OG Image URL" type="url" value={seo.og_image} onChange={(e) => setSeo(s => ({ ...s, og_image: e.target.value }))} />
               <Input label="Twitter Handle" value={seo.twitter_handle} onChange={(e) => setSeo(s => ({ ...s, twitter_handle: e.target.value }))} />
+            </CardContent>
+          </Card>
+        );
+      case "branding":
+        return (
+          <Card variant="outlined" padding="lg">
+            <CardHeader><CardTitle>Branding</CardTitle></CardHeader>
+            <CardContent className="pt-0 space-y-6">
+              <Input label="Site Name" value={branding.site_name} onChange={(e) => setBranding(b => ({ ...b, site_name: e.target.value }))} />
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium mb-3">Theme Preset</label>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {themePresets.map((preset) => (
+                      <Button
+                        key={preset.id}
+                        variant={branding.theme_preset === preset.id ? "default" : "outline"}
+                        className="h-20 flex-col gap-2 px-4"
+                        onClick={() => setBranding(b => ({ ...b, theme_preset: preset.id, primary_color: preset.primary, accent_color: preset.accent }))}
+                        style={{ borderColor: preset.primary }}
+                      >
+                        <div
+                          className="w-full h-8 rounded-lg"
+                          style={{ background: `linear-gradient(135deg, ${preset.primary} 0%, ${preset.accent} 100%)` }}
+                        />
+                        <span className="text-sm font-medium">{preset.name}</span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <label className="block text-sm font-medium mb-3">Custom Primary Color</label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="color"
+                      value={branding.primary_color}
+                      onChange={(e) => setBranding(b => ({ ...b, primary_color: e.target.value, theme_preset: "custom" }))}
+                      className="w-12 h-12 rounded-lg border border-border cursor-pointer"
+                    />
+                    <Input
+                      value={branding.primary_color}
+                      onChange={(e) => setBranding(b => ({ ...b, primary_color: e.target.value, theme_preset: "custom" }))}
+                      placeholder="#0f172a"
+                      className="max-w-xs font-mono text-sm"
+                    />
+                    <span className="text-sm text-muted-foreground">Used for buttons, links, headings</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-3">Custom Accent Color</label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="color"
+                      value={branding.accent_color}
+                      onChange={(e) => setBranding(b => ({ ...b, accent_color: e.target.value, theme_preset: "custom" }))}
+                      className="w-12 h-12 rounded-lg border border-border cursor-pointer"
+                    />
+                    <Input
+                      value={branding.accent_color}
+                      onChange={(e) => setBranding(b => ({ ...b, accent_color: e.target.value, theme_preset: "custom" }))}
+                      placeholder="#0f172a"
+                      className="max-w-xs font-mono text-sm"
+                    />
+                    <span className="text-sm text-muted-foreground">Used for hover states, borders, highlights</span>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <label className="block text-sm font-medium mb-3">Light Mode Logo</label>
+                  <MediaUploader
+                    onUploadComplete={(files) => {
+                      if (files.length > 0) {
+                        setBranding(b => ({ ...b, logo_light: files[0].storage_path }));
+                      }
+                    }}
+                    maxFiles={1}
+                    maxFileSize={5}
+                    acceptedTypes={["image/svg+xml", "image/png", "image/webp"]}
+                  />
+                  {branding.logo_light && (
+                    <p className="mt-2 text-sm text-muted-foreground">Current: {branding.logo_light}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-3">Dark Mode Logo</label>
+                  <MediaUploader
+                    onUploadComplete={(files) => {
+                      if (files.length > 0) {
+                        setBranding(b => ({ ...b, logo_dark: files[0].storage_path }));
+                      }
+                    }}
+                    maxFiles={1}
+                    maxFileSize={5}
+                    acceptedTypes={["image/svg+xml", "image/png", "image/webp"]}
+                  />
+                  {branding.logo_dark && (
+                    <p className="mt-2 text-sm text-muted-foreground">Current: {branding.logo_dark}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-3">Favicon</label>
+                  <MediaUploader
+                    onUploadComplete={(files) => {
+                      if (files.length > 0) {
+                        setBranding(b => ({ ...b, favicon: files[0].storage_path }));
+                      }
+                    }}
+                    maxFiles={1}
+                    maxFileSize={1}
+                    acceptedTypes={["image/svg+xml", "image/png", "image/x-icon", "image/vnd.microsoft.icon"]}
+                  />
+                  {branding.favicon && (
+                    <div className="mt-2 flex items-center gap-4">
+                      <p className="text-sm text-muted-foreground">Current: {branding.favicon}</p>
+                      <a
+                        href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/portfolio-media/${branding.favicon}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline"
+                      >
+                        Preview
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
         );

@@ -5,6 +5,9 @@ import path from "path";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
+  devIndicators: {
+    position: "bottom-right",
+  },
   images: {
     remotePatterns: [
       {

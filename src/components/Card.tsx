@@ -2,16 +2,18 @@ import { HTMLAttributes, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  variant?: "default" | "outlined" | "elevated";
+  variant?: "default" | "outlined" | "elevated" | "ghost";
   padding?: "none" | "sm" | "md" | "lg";
+  hover?: boolean;
 }
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
-  ({ className, variant = "default", padding = "md", children, ...props }, ref) => {
+  ({ className, variant = "default", padding = "md", hover = false, children, ...props }, ref) => {
     const variants = {
-      default: "bg-card text-card-foreground border border-border",
+      default: "bg-card text-card-foreground border border-border shadow-sm",
       outlined: "bg-background text-foreground border-2 border-border",
-      elevated: "bg-card text-card-foreground shadow-lg border-none",
+      elevated: "bg-card text-card-foreground shadow-xl border-none",
+      ghost: "bg-transparent border-none shadow-none",
     };
 
     const paddings = {
@@ -21,10 +23,14 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       lg: "p-8",
     };
 
+    const hoverStyles = hover
+      ? "transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/20"
+      : "";
+
     return (
       <div
         ref={ref}
-        className={cn("rounded-xl", variants[variant], paddings[padding], className)}
+        className={cn("rounded-xl", variants[variant], paddings[padding], hoverStyles, className)}
         {...props}
       >
         {children}

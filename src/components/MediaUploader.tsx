@@ -3,7 +3,8 @@
 import { useState, useCallback, DragEvent, ChangeEvent } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/Button";
-import { Upload, X, Image as ImageIcon, Video as VideoIcon, Loader2 } from "lucide-react";
+import { Upload, X, Image as ImageIcon, Video as VideoIcon, Loader2, CheckCircle } from "lucide-react";
+import { useToast } from "@/components/Toast";
 
 interface MediaItem {
   id: string;
@@ -13,14 +14,17 @@ interface MediaItem {
   progress: number;
   status: "pending" | "uploading" | "completed" | "error";
   error?: string;
+  storage_path?: string;
+  public_url?: string;
 }
 
 interface MediaUploaderProps {
-  onUploadComplete?: (media: { storage_path: string; media_type: "image" | "video" }[]) => void;
+  onUploadComplete?: (media: { storage_path: string; media_type: "image" | "video"; public_url: string }[]) => void;
   maxFiles?: number;
   maxFileSize?: number; // in MB
   acceptedTypes?: string[];
   className?: string;
+  bucket?: string;
 }
 
 export function MediaUploader({
@@ -29,14 +33,16 @@ export function MediaUploader({
   maxFileSize = 50,
   acceptedTypes = ["image/*", "video/mp4", "video/webm"],
   className,
+  bucket = "portfolio-media",
 }: MediaUploaderProps) {
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const { addToast } = useToast();
 
   const validateFile = (file: File): string | null => {
-    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm"];
+    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml", "image/x-icon", "video/mp4", "video/webm"];
     if (!validTypes.includes(file.type)) {
-      return "Invalid file type. Only JPEG, PNG, WebP, GIF, MP4, and WebM are allowed.";
+      return "Invalid file type. Only JPEG, PNG, WebP, GIF, SVG, ICO, MP4, and WebM are allowed.";
     }
     if (file.size > maxFileSize * 1024 * 1024) {
       return `File size exceeds ${maxFileSize}MB limit.`;
@@ -65,15 +71,14 @@ export function MediaUploader({
       filesToAdd.forEach((file) => {
         const error = validateFile(file);
         if (error) {
-          // Could add toast notification here
-          console.error(error);
+          addToast({ title: "Invalid file", description: error, type: "error" });
           return;
         }
         const newItem = createMediaItem(file);
         setMediaItems((prev) => [...prev, newItem]);
       });
     },
-    [maxFiles, mediaItems.length]
+    [maxFiles, mediaItems.length, addToast]
   );
 
   const handleDragOver = useCallback((e: DragEvent) => {
@@ -127,31 +132,37 @@ export function MediaUploader({
       );
 
       try {
-        // In a real implementation, this would upload to Supabase Storage
-        // For now, we'll simulate the upload
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        
-        // Simulate progress
-        for (let i = 0; i <= 100; i += 10) {
-          setMediaItems((prev) =>
-            prev.map((m) => (m.id === item.id ? { ...m, progress: i } : m))
-          );
-          await new Promise((resolve) => setTimeout(resolve, 50));
+        const formData = new FormData();
+        formData.append("file", item.file);
+        formData.append("bucket", bucket);
+
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Upload failed");
         }
 
         setMediaItems((prev) =>
           prev.map((m) =>
-            m.id === item.id ? { ...m, status: "completed" as const, progress: 100 } : m
-          )
-        );
-      } catch (error) {
-        setMediaItems((prev) =>
-          prev.map((m) =>
             m.id === item.id
-              ? { ...m, status: "error" as const, error: "Upload failed" }
+              ? { ...m, status: "completed" as const, progress: 100, storage_path: data.storage_path, public_url: data.public_url }
               : m
           )
         );
+      } catch (error: any) {
+        setMediaItems((prev) =>
+          prev.map((m) =>
+            m.id === item.id
+              ? { ...m, status: "error" as const, error: error.message }
+              : m
+          )
+        );
+        addToast({ title: "Upload failed", description: error.message, type: "error" });
       }
     }
 
@@ -159,7 +170,8 @@ export function MediaUploader({
     if (onUploadComplete && completed.length > 0) {
       onUploadComplete(
         completed.map((m) => ({
-          storage_path: m.file.name, // In real app, this would be the storage path from Supabase
+          storage_path: m.storage_path!,
+          public_url: m.public_url!,
           media_type: m.type,
         }))
       );
@@ -192,7 +204,7 @@ export function MediaUploader({
           {isDragging ? "Drop files here..." : "Drag & drop files here, or click to select"}
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Supports: JPEG, PNG, WebP, GIF, MP4, WebM (max {maxFileSize}MB each)
+          Supports: JPEG, PNG, WebP, GIF, SVG, ICO, MP4, WebM (max {maxFileSize}MB each)
         </p>
       </div>
 
@@ -228,7 +240,7 @@ export function MediaUploader({
                       <Loader2 className="h-8 w-8 text-white animate-spin" />
                     )}
                     {item.status === "completed" && (
-                      <span className="text-white font-medium">Uploaded</span>
+                      <CheckCircle className="h-8 w-8 text-white" />
                     )}
                     {item.status === "error" && (
                       <span className="text-white font-medium">Error</span>

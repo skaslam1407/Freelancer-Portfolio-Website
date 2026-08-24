@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Cal_Sans } from "next/font/google";
 import { ToastProvider } from "@/components/Toast";
+import { GlobalLoader } from "@/components/GlobalLoader";
 import "./globals.css";
 
 const inter = Inter({
@@ -106,6 +107,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ToastProvider>{children}</ToastProvider>
+        <GlobalLoader />
       </body>
     </html>
   );

@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Heading, Button, Card, CardContent, Badge, Input } from "@/components";
 import { AdminDataTable, Column } from "@/components/AdminDataTable";
-import { Plus, Search, Filter, MoreVertical, Edit, Trash2, Eye, ExternalLink } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, Eye, ExternalLink, Copy } from "lucide-react";
 import { useToast } from "@/components/Toast";
 import Link from "next/link";
+import type { Project } from "@/types";
 
 const statusOptions = [
   { value: "", label: "All Status" },
@@ -13,56 +14,26 @@ const statusOptions = [
   { value: "draft", label: "Draft" },
 ];
 
-const mockProjects = [
-  {
-    id: "1",
-    slug: "ecommerce-platform",
-    title: "E-Commerce Platform",
-    short_description: "A full-featured e-commerce solution",
-    featured: true,
-    status: "published",
-    sort_order: 1,
-    created_at: "2024-01-15",
-    updated_at: "2024-01-20",
-  },
-  {
-    id: "2",
-    slug: "task-management-app",
-    title: "Task Management App",
-    short_description: "Collaborative task management",
-    featured: true,
-    status: "published",
-    sort_order: 2,
-    created_at: "2023-11-20",
-    updated_at: "2023-12-01",
-  },
-  {
-    id: "3",
-    slug: "analytics-dashboard",
-    title: "Analytics Dashboard",
-    short_description: "Real-time analytics dashboard",
-    featured: false,
-    status: "draft",
-    sort_order: 3,
-    created_at: "2023-08-10",
-    updated_at: "2023-08-15",
-  },
-];
+interface AdminProjectsContentProps {
+  initialProjects: Project[];
+}
 
-export default function AdminProjectsContent() {
+export default function AdminProjectsContent({ initialProjects }: AdminProjectsContentProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const { addToast } = useToast();
 
-  const filteredProjects = mockProjects.filter((p) => {
+  const filteredProjects = projects.filter((p) => {
     const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase()) ||
       p.slug.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = !statusFilter || p.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const columns: Column<typeof mockProjects[0]>[] = [
+  const columns: Column<Project>[] = [
     {
       key: "title",
       header: "Title",
@@ -115,15 +86,42 @@ export default function AdminProjectsContent() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this project?")) return;
+    setDeletingId(id);
     try {
+      const res = await fetch(`/api/admin/projects/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete");
+      setProjects((prev) => prev.filter((p) => p.id !== id));
       addToast({ title: "Project deleted", type: "success" });
     } catch {
       addToast({ title: "Failed to delete", type: "error" });
+    } finally {
+      setDeletingId(null);
     }
   };
 
   const handleDuplicate = async (id: string) => {
     try {
+      const project = projects.find((p) => p.id === id);
+      if (!project) return;
+      
+      const res = await fetch("/api/admin/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...project,
+          title: `${project.title} (Copy)`,
+          slug: `${project.slug}-copy`,
+          status: "draft",
+          id: undefined,
+          created_at: undefined,
+          updated_at: undefined,
+        }),
+      });
+      
+      if (!res.ok) throw new Error("Failed to duplicate");
+      
+      const { data } = await res.json();
+      setProjects((prev) => [data, ...prev]);
       addToast({ title: "Project duplicated", type: "success" });
     } catch {
       addToast({ title: "Failed to duplicate", type: "error" });
@@ -199,11 +197,9 @@ export default function AdminProjectsContent() {
                     <ExternalLink className="h-4 w-4" />
                   </a>
                 </Button>
-                <div className="relative">
-                  <Button variant="ghost" size="icon">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Button variant="ghost" size="icon" disabled={deletingId === p.id} onClick={() => handleDelete(p.id)}>
+                  {deletingId === p.id ? <span className="h-4 w-4 animate-spin">⏳</span> : <Trash2 className="h-4 w-4" />}
+                </Button>
               </div>
             )}
             emptyMessage="No projects found"
@@ -216,6 +212,7 @@ export default function AdminProjectsContent() {
           <span className="text-sm font-medium">{selectedKeys.size} selected</span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => handleDuplicate(Array.from(selectedKeys)[0])}>
+              <Copy className="mr-2 h-3 w-3" />
               Duplicate
             </Button>
             <Button variant="destructive" size="sm" onClick={() => handleDelete(Array.from(selectedKeys)[0])}>

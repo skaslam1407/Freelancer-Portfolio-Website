@@ -2,6 +2,7 @@
   "name": "dev-portfolio",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",
@@ -10,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "db:push": "supabase db push",
-    "db:seed": "supabase db seed"
+    "db:seed": "supabase db seed",
+    "admin:create": "tsx scripts/create-admin-user.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.0",
@@ -28,12 +30,14 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
     "prettier": "^3.3.0",
     "prettier-plugin-tailwindcss": "^0.6.0",
     "tailwindcss": "^4",
     "tsconfig-paths-webpack-plugin": "^4.2.0",
+    "tsx": "^4.23.12",
     "typescript": "^5"
   }
 }
